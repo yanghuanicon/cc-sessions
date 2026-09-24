@@ -89,9 +89,11 @@ final class SessionStore: ObservableObject {
                   let out = Shell.run(claude, ["agents", "--json"], env: Shell.claudeEnv, timeout: 15),
                   let data = out.data(using: .utf8),
                   let items = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return }
+            let transcripts = self.transcriptIds()
             let sessions: [LiveSession] = items.compactMap { item in
+                // claude agents 会残留早已失效的后台会话（没有任何记录文件、attach 也唤不醒），不算数。
                 guard item["kind"] as? String == "background",
-                      let sessionId = item["sessionId"] as? String,
+                      let sessionId = item["sessionId"] as? String, transcripts.contains(sessionId),
                       let shortId = item["id"] as? String else { return nil }
                 let rawState = (item["state"] as? String ?? item["status"] as? String ?? "").lowercased()
                 let state: LiveState = rawState == "blocked" || rawState.contains("wait") ? .waiting
@@ -107,6 +109,20 @@ final class SessionStore: ObservableObject {
                 self.mergeLive()
             }
         }
+    }
+
+    /// 所有存在会话记录文件的 sessionId。
+    private func transcriptIds() -> Set<String> {
+        let projects = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".claude/projects")
+        let fm = FileManager.default
+        var ids = Set<String>()
+        for dir in (try? fm.contentsOfDirectory(atPath: projects.path)) ?? [] {
+            for file in (try? fm.contentsOfDirectory(atPath: projects.appendingPathComponent(dir).path)) ?? []
+            where file.hasSuffix(".jsonl") {
+                ids.insert(String(file.dropLast(".jsonl".count)))
+            }
+        }
+        return ids
     }
 
     private func readRegistry() -> [LiveSession] {
