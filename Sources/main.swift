@@ -38,7 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel = KeyPanel(contentRect: NSRect(x: 0, y: 0, width: 390, height: 560),
                          styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         panel.isFloatingPanel = true
-        panel.level = .popUpMenu
+        // 用浮动层而不是菜单层：截图工具（微信 ⌥A、系统 ⌘⇧4）的遮罩要能盖在面板上，否则框选时点击会被面板接走。
+        panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.backgroundColor = .clear
         panel.isOpaque = false
