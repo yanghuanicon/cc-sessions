@@ -335,6 +335,39 @@ final class SessionStore: ObservableObject {
         }.prefix(15).map { $0 }
     }
 
+    /// 一键结束终端里的会话。发 SIGTERM：Claude Code 会在 1 秒内正常退出，
+    /// 会话记录是边聊边追加写的，结束后仍可 --resume。桌面端、程序拉起的、后台会话不碰，避免误伤飞书机器人等服务。
+    func exitAll() {
+        let targets = live.filter { session in
+            guard session.pid != nil, case .terminal = session.host else { return false }
+            return true
+        }
+        guard !targets.isEmpty else { return say("没有可以结束的终端会话") }
+        let idle = targets.filter { $0.state == .idle }
+        let active = targets.filter { $0.state != .idle }
+        closePanel?()
+
+        let alert = NSAlert()
+        alert.messageText = "结束 iTerm 里的 Claude 会话"
+        let list = { (sessions: [LiveSession]) in sessions.map { "· " + $0.name }.joined(separator: "\n") }
+        var info = "空闲 \(idle.count) 个：\n" + (idle.isEmpty ? "（无）" : list(idle))
+        if !active.isEmpty { info += "\n\n运行中或等你回复 \(active.count) 个：\n" + list(active) }
+        info += "\n\n会话记录都会保留，之后可以从历史里恢复。桌面端和程序拉起的会话不受影响。"
+        alert.informativeText = info
+        if !idle.isEmpty { alert.addButton(withTitle: "结束空闲的 \(idle.count) 个") }
+        if !active.isEmpty { alert.addButton(withTitle: "全部结束（含运行中 \(active.count) 个）") }
+        alert.addButton(withTitle: "取消")
+        NSApp.activate(ignoringOtherApps: true)
+        let response = alert.runModal()
+        let buttons = alert.buttons.map(\.title)
+        let index = response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+        guard index >= 0, index < buttons.count, buttons[index] != "取消" else { return }
+        let chosen = buttons[index].hasPrefix("全部") ? targets : idle
+        for session in chosen { if let pid = session.pid { kill(pid, SIGTERM) } }
+        say("已结束 \(chosen.count) 个会话")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.refreshLive() }
+    }
+
     func launch(_ command: String) {
         runInNewTab(command)
     }

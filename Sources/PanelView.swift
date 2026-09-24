@@ -224,8 +224,14 @@ struct PanelView: View {
                 Toggle("程序会话", isOn: $store.showProgrammatic)
                     .toggleStyle(.checkbox).font(.system(size: 11))
                     .help("显示 claude -p、飞书机器人等程序拉起的会话")
-                Button("刷新") { store.refreshLive(); store.refreshHistory(); store.refreshBackground() }
-                Button("退出") { NSApp.terminate(nil) }
+                Button { store.refreshLive(); store.refreshHistory(); store.refreshBackground() } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help("刷新")
+                Button("结束全部") { store.exitAll() }
+                    .help("结束 iTerm 里所有 Claude 会话（会先确认）")
+                Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
+                    .help("关闭 CC会话 工具")
             }
         }
         .buttonStyle(.plain)
