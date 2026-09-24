@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             image?.isTemplate = true
             button.image = image
             button.imagePosition = .imageLeading
-            button.action = #selector(togglePanel)
+            button.action = #selector(iconClicked)
             button.target = self
         }
         setupPanel()
@@ -63,17 +63,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.contentView = effect
     }
 
-    @objc func togglePanel() {
-        if panel.isVisible { hidePanel() } else if Date().timeIntervalSince(lastHiddenAt) > 0.3 { showPanel() }
+    /// 点图标打开时图标必然可见，直接挂在它下面。
+    @objc func iconClicked() {
+        togglePanel(fromIcon: true)
     }
 
-    private func showPanel() {
+    func togglePanel(fromIcon: Bool = false) {
+        if panel.isVisible { hidePanel() } else if Date().timeIntervalSince(lastHiddenAt) > 0.3 { showPanel(fromIcon: fromIcon) }
+    }
+
+    /// 图标当前是否真的显示在菜单栏上（菜单项多的应用在前台时会被系统挤掉）。
+    private func iconVisible() -> Bool {
+        guard let window = statusItem.button?.window, let screen = window.screen else { return false }
+        // 注意要用 frame 而不是 visibleFrame：visibleFrame 不含菜单栏，图标永远落在它外面。
+        return window.occlusionState.contains(.visible) && screen.frame.contains(window.frame)
+    }
+
+    private func showPanel(fromIcon: Bool) {
         guard let screen = NSScreen.main else { return }
         let size = panel.frame.size
         var origin: NSPoint
         if let button = statusItem.button, let window = button.window,
-           window.occlusionState.contains(.visible),
-           let buttonScreen = window.screen, buttonScreen.visibleFrame.intersects(window.frame) {
+           let buttonScreen = window.screen, fromIcon || iconVisible() {
             // 图标可见：面板挂在图标正下方，右边不超出屏幕。
             let anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
             let visible = buttonScreen.visibleFrame
