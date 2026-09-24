@@ -210,35 +210,42 @@ struct PanelView: View {
         }
 
     private var footer: some View {
-        HStack(spacing: 4) {
+        VStack(spacing: 0) {
             if let notice = store.notice {
-                Text(notice).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(2)
-                    .padding(.leading, 10)
-                Spacer()
-            } else {
-                Button { creating = true } label: { Label("新建", systemImage: "plus") }
-                    .foregroundStyle(Color.accentColor)
-                    .padding(.leading, 8)
-                    .help("新建会话（⌘N）")
-                Spacer()
-                Toggle("程序会话", isOn: $store.showProgrammatic)
-                    .toggleStyle(.checkbox).font(.system(size: 11))
-                    .help("显示 claude -p、飞书机器人等程序拉起的会话")
-                Button { store.refreshLive(); store.refreshHistory(); store.refreshBackground() } label: {
-                    Image(systemName: "arrow.clockwise")
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                    Text(notice).lineLimit(2)
+                    Spacer()
                 }
-                .help("刷新")
-                Button("结束全部") { store.exitAll() }
-                    .help("结束 iTerm 里所有 Claude 会话（会先确认）")
-                Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
-                    .help("关闭 CC会话 工具")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14).padding(.vertical, 6)
+                .background(Color.accentColor.opacity(0.08))
             }
+            HStack(spacing: 6) {
+                Button { creating = true } label: { Label("新建会话", systemImage: "plus") }
+                    .buttonStyle(FooterButtonStyle(prominent: true))
+                    .help("在 iTerm 新标签页启动一个 Claude 会话（⌘N）")
+                Spacer()
+                Button { store.exitAll() } label: { Label("结束会话…", systemImage: "stop.circle") }
+                    .buttonStyle(FooterButtonStyle())
+                    .help("结束 iTerm 里的 Claude 会话，会先列出名单让你确认")
+                Menu {
+                    Toggle("显示程序拉起的会话", isOn: $store.showProgrammatic)
+                    Button("刷新") { store.refreshLive(); store.refreshHistory(); store.refreshBackground() }
+                    Divider()
+                    Button("退出 CC会话") { NSApp.terminate(nil) }
+                } label: {
+                    Image(systemName: "ellipsis.circle").font(.system(size: 14))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .foregroundStyle(.secondary)
+                .help("更多")
+            }
+            .padding(.horizontal, 10).padding(.vertical, 8)
         }
-        .buttonStyle(.plain)
-        .font(.system(size: 12))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 6).padding(.vertical, 8)
-        .frame(minHeight: 34)
     }
 
     // MARK: - 行为
@@ -481,5 +488,36 @@ struct RowView: View {
     private var background: Color {
         if isSelected { return .accentColor }
         return hovering ? Color.primary.opacity(0.06) : .clear
+    }
+}
+
+/// 底部栏按钮：浅底圆角，主按钮用主题色，悬停时底色加深，让「能点」一眼可见。
+struct FooterButtonStyle: ButtonStyle {
+    var prominent = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        FooterButton(configuration: configuration, prominent: prominent)
+    }
+
+    private struct FooterButton: View {
+        let configuration: ButtonStyle.Configuration
+        let prominent: Bool
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 12, weight: prominent ? .semibold : .regular))
+                .foregroundStyle(prominent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .padding(.horizontal, 9).padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 6).fill(fill))
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+        }
+
+        private var fill: Color {
+            let base = prominent ? Color.accentColor : Color.primary
+            if configuration.isPressed { return base.opacity(0.2) }
+            return base.opacity(hovering ? 0.14 : 0.07)
+        }
     }
 }
