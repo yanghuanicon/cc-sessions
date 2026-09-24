@@ -13,6 +13,15 @@ final class SessionStore: ObservableObject {
     @Published var notice: String?
     /// 每次打开面板加一，视图据此把焦点放回搜索框。
     @Published var focusToken = 0
+    /// 是否显示程序拉起的会话（claude -p、飞书机器人等），默认隐藏。
+    @Published var showProgrammatic = UserDefaults.standard.bool(forKey: "showProgrammatic") {
+        didSet {
+            UserDefaults.standard.set(showProgrammatic, forKey: "showProgrammatic")
+            applyHistoryFilter()
+            mergeLive()
+        }
+    }
+    private var allHistory: [HistoryEntry] = []
 
     var panelOpen = false { didSet { if panelOpen { refreshLive(); refreshHistory(); refreshBackground() } } }
     var onBadgeChange: ((Int) -> Void)?
@@ -64,7 +73,8 @@ final class SessionStore: ObservableObject {
             guard let self else { return }
             let list = self.indexer.refresh()
             DispatchQueue.main.async {
-                self.history = list
+                self.allHistory = list
+                self.applyHistoryFilter()
                 self.titles = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
                 self.indexing = false
                 self.mergeLive()
@@ -127,10 +137,15 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    private func applyHistoryFilter() {
+        history = showProgrammatic ? allHistory : allHistory.filter { !$0.isProgrammatic }
+    }
+
     private func mergeLive() {
         var seen = Set<String>()
         let merged = (registrySessions + backgroundSessions).compactMap { session -> LiveSession? in
             guard seen.insert(session.id).inserted else { return nil }
+            if session.host == .sdk && !showProgrammatic { return nil }
             var s = session
             if s.name.isEmpty {
                 s.name = titles[s.id]?.title ?? Format.shortDir(s.cwd)

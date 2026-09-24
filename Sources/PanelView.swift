@@ -179,6 +179,9 @@ struct PanelView: View {
                 Text("\(store.live.count) 个开着 · \(store.history.count) 个历史")
                     .font(.system(size: 11)).foregroundStyle(.tertiary).padding(.leading, 10)
                 Spacer()
+                Toggle("程序会话", isOn: $store.showProgrammatic)
+                    .toggleStyle(.checkbox).font(.system(size: 11))
+                    .help("显示 claude -p、飞书机器人等程序拉起的会话")
                 Button("刷新") { store.refreshLive(); store.refreshHistory(); store.refreshBackground() }
                 Button("退出") { NSApp.terminate(nil) }
             }

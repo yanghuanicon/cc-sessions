@@ -7,7 +7,7 @@ final class HistoryIndexer {
     private let cacheURL: URL = {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("cc-sessions")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("index-v2.json")
+        return dir.appendingPathComponent("index-v3.json")
     }()
     /// 超过这个长度的行基本是图片或大段工具输出，跳过不解析。
     private let maxLineBytes = 512 * 1024
@@ -125,6 +125,7 @@ final class HistoryIndexer {
               let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
               let type = obj["type"] as? String else { return }
         if entry.cwd.isEmpty, let cwd = obj["cwd"] as? String { entry.cwd = cwd }
+        if entry.entrypoint.isEmpty, let entrypoint = obj["entrypoint"] as? String { entry.entrypoint = entrypoint }
         // 非 git 目录或 detached 时记录的是 HEAD，不能覆盖掉真实分支名。
         if let branch = obj["gitBranch"] as? String, !branch.isEmpty, branch != "HEAD" { entry.branch = branch }
         switch type {

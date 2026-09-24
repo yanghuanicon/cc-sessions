@@ -51,12 +51,16 @@ struct HistoryEntry: Identifiable, Codable {
     var firstPrompt: String = ""
     var lastReply: String = ""
     var turns: Int = 0
+    /// cli 是终端里开的；sdk-cli 等是程序拉起的（claude -p、飞书机器人）。
+    var entrypoint: String = ""
     var modifiedAt: Date = .distantPast
     var size: UInt64 = 0
     /// 已解析到的字节位置；jsonl 只追加，下次只读新增部分。
     var offset: UInt64 = 0
     /// 用于全文检索的文本，只保留最近的一段，避免内存膨胀。
     var searchText: String = ""
+
+    var isProgrammatic: Bool { entrypoint.hasPrefix("sdk") }
 
     var title: String {
         if !customTitle.isEmpty { return customTitle }
