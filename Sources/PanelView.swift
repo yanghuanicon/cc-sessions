@@ -20,12 +20,21 @@ struct PanelView: View {
     @State private var editingId: String?
     @State private var editText = ""
     @State private var showAll = false
+    @State private var creating = false
     @FocusState private var searchFocused: Bool
     @FocusState private var renameFocused: Bool
 
     private let recentLimit = 6
 
     var body: some View {
+        if creating {
+            NewSessionView(store: store) { creating = false; searchFocused = true }
+        } else {
+            list
+        }
+    }
+
+    private var list: some View {
         VStack(spacing: 0) {
             searchField
             Divider()
@@ -49,8 +58,10 @@ struct PanelView: View {
         }
         .onChange(of: store.focusToken) { _, _ in
             editingId = nil
+            creating = false
             searchFocused = true
         }
+        .background(Button("") { creating = true }.keyboardShortcut("n", modifiers: .command).hidden())
         .onAppear { searchFocused = true }
         .onExitCommand { if editingId == nil { store.closePanel?() } }
     }
@@ -205,8 +216,10 @@ struct PanelView: View {
                     .padding(.leading, 10)
                 Spacer()
             } else {
-                Text("\(store.live.count) 个开着 · \(store.history.count) 个历史")
-                    .font(.system(size: 11)).foregroundStyle(.tertiary).padding(.leading, 10)
+                Button { creating = true } label: { Label("新建", systemImage: "plus") }
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.leading, 8)
+                    .help("新建会话（⌘N）")
                 Spacer()
                 Toggle("程序会话", isOn: $store.showProgrammatic)
                     .toggleStyle(.checkbox).font(.system(size: 11))

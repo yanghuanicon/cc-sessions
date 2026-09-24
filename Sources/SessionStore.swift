@@ -323,6 +323,22 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    /// 新建会话用：最近用过的项目目录，按最后使用时间排，去掉临时目录和已删除的目录。
+    var recentFolders: [String] {
+        var seen = Set<String>()
+        let candidates = live.map(\.cwd) + allHistory.map(\.cwd)
+        return candidates.filter { path in
+            guard !path.isEmpty, !path.hasPrefix("/private/"), !path.hasPrefix("/var/folders/"),
+                  !path.hasPrefix("/tmp/"), seen.insert(path).inserted else { return false }
+            var isDir: ObjCBool = false
+            return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
+        }.prefix(15).map { $0 }
+    }
+
+    func launch(_ command: String) {
+        runInNewTab(command)
+    }
+
     private func runInNewTab(_ command: String) {
         switch ITerm.openTab(command: command) {
         case .ok, .notFound: closePanel?()
