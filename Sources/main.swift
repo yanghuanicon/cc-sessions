@@ -101,9 +101,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         store.panelOpen = false
     }
 
-    /// 点面板外面任何地方就收起，行为和系统菜单一致。
+    /// 点到别的应用或桌面就收起。截图（⌘⇧4 / ⌘⇧5）也会抢走焦点，但前台应用不变，这时不收，面板才截得进去。
     func windowDidResignKey(_ notification: Notification) {
-        hidePanel()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard NSWorkspace.shared.frontmostApplication?.processIdentifier != getpid() else { return }
+            self?.hidePanel()
+        }
     }
 
     /// 菜单栏上只在有会话等你处理时显示橙色数字。

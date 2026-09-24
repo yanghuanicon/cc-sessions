@@ -52,6 +52,7 @@ struct PanelView: View {
             searchFocused = true
         }
         .onAppear { searchFocused = true }
+        .onExitCommand { if editingId == nil { store.closePanel?() } }
     }
 
     // MARK: - 数据
