@@ -31,7 +31,7 @@ struct PanelView: View {
             Divider()
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) { content }
+                    VStack(alignment: .leading, spacing: 0) { content }
                         .padding(.horizontal, 5)
                         .padding(.bottom, 6)
                 }
@@ -99,33 +99,62 @@ struct PanelView: View {
         .padding(10)
     }
 
-    @ViewBuilder
-    private var content: some View {
-        let live = liveRows
-        let flat = rows
-        ForEach([LiveState.waiting, .busy, .idle], id: \.rawValue) { state in
-            let group = live.filter { $0.state == state }
-            if !group.isEmpty {
-                sectionHeader(title(of: state), count: group.count, color: color(of: state))
-                ForEach(group) { session in
-                    rowView(.live(session), index: flat.firstIndex { $0.id == "live:" + session.id })
-                }
+    /// 列表里的每一项（分组标题、会话行、分隔线、提示文字）拍平成一个数组，
+    /// 用唯一 id 渲染；嵌套 ForEach 在会话跨组移动时会复用旧行，导致显示和点击错位。
+    private enum Item: Identifiable {
+        case header(LiveState, count: Int)
+        case row(Row)
+        case note(String)
+        case divider
+        case historyHeader
+
+        var id: String {
+            switch self {
+            case .header(let state, _): return "header:\(state.rawValue)"
+            case .row(let row): return row.id
+            case .note(let text): return "note:" + text
+            case .divider: return "divider"
+            case .historyHeader: return "historyHeader"
             }
         }
-        if live.isEmpty && store.results == nil {
-            Text("现在没有开着的 Claude 会话").font(.system(size: 12)).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity).padding(.vertical, 10)
+    }
+
+    private var items: [Item] {
+        var items: [Item] = []
+        let live = liveRows
+        for state in [LiveState.waiting, .busy, .idle] {
+            let group = live.filter { $0.state == state }
+            guard !group.isEmpty else { continue }
+            items.append(.header(state, count: group.count))
+            items += group.map { .row(.live($0)) }
         }
-        Divider().padding(.vertical, 6).padding(.horizontal, 6)
-        historyHeader
+        if live.isEmpty && store.results == nil { items.append(.note("现在没有开着的 Claude 会话")) }
+        items += [.divider, .historyHeader]
         let history = historyRows
         if history.isEmpty {
-            Text(store.indexing ? "正在建立历史索引…" : (store.results != nil ? "历史里没有匹配「\(query)」的会话" : "还没有历史会话"))
-                .font(.system(size: 12)).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity).padding(.vertical, 12)
+            items.append(.note(store.indexing ? "正在建立历史索引…" : (store.results != nil ? "历史里没有匹配「\(query)」的会话" : "还没有历史会话")))
         }
-        ForEach(history) { entry in
-            rowView(.history(entry), index: flat.firstIndex { $0.id == "hist:" + entry.id })
+        items += history.map { .row(.history($0)) }
+        return items
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        let flat = rows
+        ForEach(items) { item in
+            switch item {
+            case .header(let state, let count):
+                sectionHeader(title(of: state), count: count, color: color(of: state))
+            case .row(let row):
+                rowView(row, index: flat.firstIndex { $0.id == row.id })
+            case .note(let text):
+                Text(text).font(.system(size: 12)).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity).padding(.vertical, 10)
+            case .divider:
+                Divider().padding(.vertical, 6).padding(.horizontal, 6)
+            case .historyHeader:
+                historyHeader
+            }
         }
     }
 
@@ -163,12 +192,11 @@ struct PanelView: View {
     private func rowView(_ row: Row, index: Int?) -> some View {
         RowView(row: row, store: store, snippet: snippet(for: row), isSelected: index != nil && index == selected,
                 isEditing: editingId == rowSessionId(row), editText: $editText, renameFocused: $renameFocused,
-                onOpen: { if let index { activate(index) } },
+                onOpen: { open(row) },
                 onRename: { startRename(row) },
                 onCommitRename: { commitRename() },
                 onCancelRename: { editingId = nil; searchFocused = true })
-            .id(row.id)
-    }
+        }
 
     private var footer: some View {
         HStack(spacing: 4) {
@@ -204,7 +232,11 @@ struct PanelView: View {
 
     private func activate(_ index: Int) {
         guard index < rows.count else { return }
-        switch rows[index] {
+        open(rows[index])
+    }
+
+    private func open(_ row: Row) {
+        switch row {
         case .live(let s): store.open(s)
         case .history(let h): store.open(h)
         }
